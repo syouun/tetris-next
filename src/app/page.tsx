@@ -1,5 +1,11 @@
 'use client';
-import TetrisGame from '../components/TetrisGame';
+import dynamic from 'next/dynamic';
+
+// クライアントサイドのみでレンダリングするように設定
+const TetrisGame = dynamic(() => import('../components/TetrisGame'), {
+  ssr: false,
+  loading: () => <div className="text-white">Loading game...</div>
+});
 
 export default function Home() {
   return (
