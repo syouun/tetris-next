@@ -105,7 +105,7 @@ function clearRows(grid: Cell[][], rows: number[]): Cell[][] {
   return newGrid;
 }
 function scoreDelta(lines: number): number {
-  // Align to user's original: 0, 40, 100, 300, 1200
+  // Align to original: 0, 40, 100, 300, 1200
   return [0, 40, 100, 300, 1200][lines] || 0;
 }
 function levelToFall(level: number): number {
@@ -176,8 +176,9 @@ function stepGravity(prev: GameState): GameState {
   return lockWithAnimation(prev);
 }
 function hardDrop(prev: GameState): GameState {
-  let { currentPiece, grid } = prev;
-  let { x, y, shape } = currentPiece;
+  const { currentPiece, grid } = prev;
+  const { x, shape } = currentPiece;
+  let y = currentPiece.y;
   while (!collides(grid, shape, x, y + 1)) y++;
   const landed: GameState = { ...prev, currentPiece: { ...currentPiece, y } };
   return lockWithAnimation(landed);

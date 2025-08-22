@@ -1,16 +1,18 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+// eslint.config.mjs
+import next from 'eslint-config-next';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+/** @type {import('eslint').Linter.FlatConfig[]} */
+export default [
+  // まず無視パターン（.eslintignore は使われないため、ここで指定）
+  { ignores: ['**/.next/**', '**/node_modules/**', 'src/components/old/**'] },
 
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
+  // Next.js 推奨（React/TypeScript も含む）
+  ...next,
 
-const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  // 追加で独自ルールを入れたい場合は、最後にブロックを足してください
+  // {
+  //   rules: {
+  //     // 例: 'no-console': 'warn',
+  //   },
+  // },
 ];
-
-export default eslintConfig;
