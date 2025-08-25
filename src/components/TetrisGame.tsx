@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import GameBoard from './GameBoard';
@@ -187,6 +186,7 @@ function hardDrop(prev: GameState): GameState {
 export default function TetrisGame() {
   const [softDrop, setSoftDrop] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false); // ✅ PLAYボタンで開始
   const [version, setVersion] = useState(0);
   const lastFallRef = useRef<number>(performance.now());
   const clearTimerRef = useRef<number | null>(null);
@@ -225,6 +225,7 @@ export default function TetrisGame() {
     }
     lastFallRef.current = performance.now();
     setSoftDrop(false);
+    // hasStartedは維持：ゲーム中のRestartでは再クリック不要
     setPaused(false);
     setVersion(v => v + 1);
   }, []);
@@ -258,10 +259,40 @@ export default function TetrisGame() {
     });
   }, []);
 
+  // ✅ PLAYクリック時のハンドラ：10分キャップ＋カスタムイベント発火
+  const onPlay = useCallback(() => {
+    let canShowInterstitial = false;
+    try {
+      const CAP_MS = 10 * 60 * 1000; // 10分
+      const last = Number(localStorage.getItem('tetris_interstitial_last_shown') || '0');
+      const now = Date.now();
+      canShowInterstitial = now - last >= CAP_MS;
+      if (canShowInterstitial) {
+        localStorage.setItem('tetris_interstitial_last_shown', String(now));
+      }
+    } catch (_) { /* SSR対策/プライベートモード等で失敗しても無視 */ }
+
+    // 外部のGPTコード側（_app.tsxや専用hook）でリッスンして表示する
+    try {
+      window.dispatchEvent(new CustomEvent('tetris:play-clicked', {
+        detail: { canShowInterstitial }
+      }));
+    } catch (_) { /* ignore */ }
+
+    setHasStarted(true);
+    setPaused(false);
+  }, []);
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (['ArrowDown','ArrowLeft','ArrowRight','ArrowUp',' ','p','P'].includes(e.key)) e.preventDefault();
       if (e.key === 'p' || e.key === 'P') { setPaused(p => !p); return; }
+
+      if (!hasStarted) {
+        // 未開始時はRのみ許可（初期化用）。それ以外は無視。
+        if (e.key === 'r' || e.key === 'R') restart();
+        return;
+      }
 
       if (state.gameOver) {
         if (e.key === 'r' || e.key === 'R') restart();
@@ -298,10 +329,11 @@ export default function TetrisGame() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [paused, restart, state.gameOver, state.animatingClear, tryMove, tryRotate]);
+  }, [paused, restart, state.gameOver, state.animatingClear, tryMove, tryRotate, hasStarted]);
 
+  // ✅ ゲームループ：開始前は動かない
   useEffect(() => {
-    if (state.gameOver) return;
+    if (!hasStarted || state.gameOver) return;
     let raf = 0;
     const loop = () => {
       if (!paused && !state.animatingClear) {
@@ -316,7 +348,7 @@ export default function TetrisGame() {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [paused, state.fallSpeed, state.gameOver, state.animatingClear, softDrop]);
+  }, [paused, state.fallSpeed, state.gameOver, state.animatingClear, softDrop, hasStarted]);
 
   useEffect(() => {
     if (!state.animatingClear || !state.pendingClear) return;
@@ -362,6 +394,23 @@ export default function TetrisGame() {
       />
 
       <div className="w-64">
+        {/* PLAYボタン（未開始時のみ） */}
+        {!hasStarted && !state.gameOver && (
+          <div className="mb-6 text-center">
+            <button
+              onClick={onPlay}
+              className="bg-green-600 text-white px-8 py-4 rounded-2xl text-2xl font-semibold shadow hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-400"
+              aria-label="Play Game"
+            >
+              PLAY
+            </button>
+            <p className="text-gray-300 text-xs mt-2 leading-5">
+              はじめるを押すとゲームが開始します。<br/>
+              条件を満たす場合、全画面広告が1回だけ表示されることがあります。
+            </p>
+          </div>
+        )}
+
         <div className="mb-6">
           <h2 className="text-white text-xl mb-2">Score: {state.score}</h2>
           <h2 className="text-white text-xl">Level: {state.level}</h2>
